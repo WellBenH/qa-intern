@@ -1,0 +1,42 @@
+{
+	"type": "object",
+		"properties": {
+			"suites": {
+				"type": "array",
+				"items": [
+					{
+						"type": "object",
+						"properties": {
+							"name": {
+								"type": "string"
+							},
+							"tests": {
+								"type": "number",
+								"minimum": 0
+							},
+							"cases": {
+								"type": "array",
+								"items": [
+									{
+										"type": "object",
+										"properties": {
+											"name": {
+												"type": "string"
+											},
+											"errors": {
+												"type": "number",
+												"minimum": 0
+											},
+											"time": {
+												"type": "string"
+											}
+										}
+									}
+								]
+							}
+						}
+					}
+				]
+			}
+		}
+}

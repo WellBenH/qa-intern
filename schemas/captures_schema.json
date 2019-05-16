@@ -1,0 +1,24 @@
+{
+	"type": "object",
+		"properties": {
+			"captures": {
+				"type": "array",
+				"items": [
+					{
+						"type": "object",
+						"properties": {
+							"expected": {
+								"type": "string"
+							},
+							"actual": {
+								"type": "string"
+							},
+							"time": {
+								"type": "string"
+							}
+						}
+					}
+				]
+			}
+		}
+}
