@@ -3,8 +3,8 @@
 """
 task: qa-unit-intern-task + jsonschema check + docker
 date: 16.05.19
-author: Fomichev V
 docker_url: 2653/qa_intern
+git: https://github.com/WellBenH/qa-intern/
 """
 
 import os
@@ -14,14 +14,14 @@ from datetime import datetime
 from time import gmtime, strftime
 
 need_to_check_schemas = True
+direct_to_json = os.path.join(os.curdir, 'json_files')  # папка с исходными файлами
+direct_with_result = os.path.join(os.curdir, 'results')  # папка в которую сохраняются результаты
+direct_with_schemas = os.path.join(os.curdir, 'schemas')  # папка с протатипами схем для jsonschema
+utc_offset = datetime.now().timestamp() - datetime.utcnow().timestamp()  # сдвиг для преобразовния даты к GMT+0
+utc_offset += 1 if os.name != 'nt' else 0  # небольшой костыль для докера
 
-direct_to_json = os.path.join(os.curdir, 'json_files')
-direct_with_result = os.path.join(os.curdir, 'results')
-direct_with_schemas = os.path.join(os.curdir, 'schemas')
-utc_offset = datetime.now().timestamp() - datetime.utcnow().timestamp()
-utc_offset += 1 if os.name != 'nt' else 0
 
-
+# Функция для валидации json данных по протатипам схем
 def json_validate(schema_type, json_data):
 
     schemas = {
@@ -30,6 +30,7 @@ def json_validate(schema_type, json_data):
         'captures': 'captures_schema.json'
     }
 
+    # Если существует папка с протатипами схем, то открыть и сравнить данные со схемой, которая выбирается по ключу
     if os.path.exists(os.path.join(direct_with_schemas, schemas[schema_type])):
         with open(os.path.join(direct_with_schemas, schemas[schema_type])) as j_schema:
             try:
@@ -40,9 +41,11 @@ def json_validate(schema_type, json_data):
                 return 0
 
 
+# Сбор сырых данных из файлом с предверительным объединением по ключу
 def get_data_from_json_files():
     result = {}
 
+    # обработка результатов из файлов типа logs
     def get_logs_result(logs):
         for log in logs["logs"]:
             try:
@@ -50,6 +53,7 @@ def get_data_from_json_files():
             except (KeyError, ValueError):
                 continue
 
+    # обработка результатов из файлов типа suites, дата приводится к epoch по маске со сдвигом
     def get_suites_result(suites):
         for suite in suites["suites"]:
             try:
@@ -61,6 +65,7 @@ def get_data_from_json_files():
             except (KeyError, TypeError, ValueError):
                 continue
 
+    # обработка результатов из файлов типа captures, дата приводится к epoch по маске
     def get_captures_result(captures):
         for capture in captures["captures"]:
             try:
@@ -83,14 +88,15 @@ def get_data_from_json_files():
                 ):
                     if not raw_data.get(type_key):
                         continue
+                    # если необходимо проверять схемы, но проверка не пройдена, то файл пропускается
                     if need_to_check_schemas and not json_validate(type_key, raw_data):
-                        continue
+                        break
                     for item in func(raw_data):
                         for key, value in item.items():
                             if result.get(key):
-                                result[key].update(value)
+                                result[key].update(value)  # добавить информацию по ключу
                             else:
-                                result.update({key: value})
+                                result.update({key: value})  # создать данные с ключом
                     break
         except json.decoder.JSONDecodeError:
             continue
@@ -98,6 +104,7 @@ def get_data_from_json_files():
     return result
 
 
+#  создание структурны выходных данных из сырых данных
 def get_data_for_result_json_file(raw_result):
     name_dict = {
         'name': 'test_name',
@@ -107,7 +114,7 @@ def get_data_for_result_json_file(raw_result):
         'expected': 'expected_result',
         'actual': 'actual_result'
     }
-    result_names = set(name_dict.values())
+    result_names = set(name_dict.values())  # создание списка полей без повторов
     result = {"results": []}
     for data in raw_result.values():
         local = {}
@@ -115,12 +122,13 @@ def get_data_for_result_json_file(raw_result):
             field_name = name_dict.get(field)
             if not field_name:
                 continue
-            if field_name is 'test_status' and type(value) == int:
+            if field_name is 'test_status' and type(value) == int:  # приведение результат в поле test_status
                 value = 'fail' if value else 'success'
             local.update({field_name: value})
 
         success_counter = 0
 
+        #  принятие решения о полноте данных по колличеству полей
         for exp_name in result_names:
             if exp_name in local.keys():
                 success_counter += 1
@@ -131,6 +139,7 @@ def get_data_for_result_json_file(raw_result):
     return result
 
 
+# сохранение результата в файл
 def save_result(result):
     os.makedirs(direct_with_result, exist_ok=True)
     file_name = strftime('%Y%m%d%H%M%S', gmtime()) + '_join_result.json'
